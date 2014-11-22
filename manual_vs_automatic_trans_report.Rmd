@@ -1,0 +1,135 @@
+---
+title: "Manual vs Automatic Transmission"
+author: "Kyle Scully"
+date: "November 22, 2014"
+output: html_document
+---
+
+```{r echo=FALSE}
+library(ggplot2)
+library("GGally")
+data(mtcars)
+```
+
+# Executive Summary
+
+A common question motor enthusiast often ask is does transmission type have significant impact on fuel efficiency.  We will analyze a dataset from Motor Trend magazine which comprises fuel consumption and 10 aspects of automobiles to address these questions:
+
+* Is an automatic or manual transmission better for MPG?
+* If so, what is the quantity difference?
+
+This report will show that using hypothesis testing and linear regression, manual transmissions are generally more fuel efficient than automatic transmissions.  Taking confounding variables into account, we will use analysis of variance and multivariate regression to show that manual transmissions, on average, get 2 miles per gallon better fuel efficiency than automatic transmissions.
+
+# Exploratory Analysis
+
+### The Data Set
+
+A data frame with 32 observations on 11 variables.
+
+* [, 1]   mpg 	Miles/(US) gallon
+* [, 2] 	cyl 	Number of cylinders
+* [, 3] 	disp 	Displacement (cu.in.)
+* [, 4] 	hp 	Gross horsepower
+* [, 5] 	drat 	Rear axle ratio
+* [, 6] 	wt 	Weight (lb/1000)
+* [, 7] 	qsec 	1/4 mile time
+* [, 8] 	vs 	V/S
+* [, 9] 	am 	Transmission (0 = automatic, 1 = manual)
+* [,10] 	gear 	Number of forward gears
+* [,11] 	carb 	Number of carburetors
+
+### General Relation of Variables
+
+```{r echo=FALSE}
+plot(mtcars)
+```
+
+From the above plot we can generally see how data variables affect MPG.
+
+### Focused Subset of Variables
+
+Let's take a quick look at the distributions & the correlations between some of the variables that stand out:
+
+```{r echo=FALSE}
+ggpairs(mtcars[,c(1:4,6,9)], lower=list(continuous="smooth", params=c(colour="blue")),
+diag=list(continuous="bar",params=c(colour="blue")),
+upper=list(params=list(corSize=6)), axisLabels='show')
+```
+
+
+From the above plot we can note a few things:
+
+* The distribution of MPG is fairly normal
+* There seems to be a higher average MPG for vehicles with manual transmissions
+* There is a high correlation between mpg and wt, cyl, disp, and hp
+* We also see a very high correlation between cyl and disp
+
+```{r}
+means <- aggregate(mpg~am, data = mtcars, mean)
+means
+means[2,2] -means[1,2]
+```
+
+We can see that the average difference in mpg between transmission type is `r means[2,2] -means[1,2]`
+
+# Hypothesis Testing
+
+We need to test the validity of this by running a t-test o nthe null-hypothesis:
+
+```{r}
+manual <- mtcars[mtcars$am == 1,]
+auto <- mtcars[mtcars$am == 0,]
+t.test(auto$mpg, manual$mpg)
+```
+
+From this p-value we must reject the null hypothesis.
+
+**This means that there is a significant difference in fuel efficiency with respects to transmission type: vehicles with manual transmissions on average have higher fuel efficiency than vehicles with automatic transmissions.**
+
+# Linear Regression Model
+
+### Simple Linear Regression
+Let's look at a simple linear regression between transmission type and miles per gallons:
+
+```{r}
+fit <- lm(mpg~am, data = mtcars)
+summary(fit)
+```
+
+Looking at the Multiple R-squared we see this model only explains about 36% of the variance so it is not a good model
+
+### Multivariate Linear Regression
+
+Earlier we noticed that cylinders and displacement were highly correlated to each other.  We also noticed that horsepower has a high correlation to displacement.  Due to these relationships we will exclude cylinders and displacement from being predictors in our model as they are collinear and more or less discrete values.
+
+```{r}
+fit2 <- lm(mpg~am + wt + hp, data = mtcars)
+anova(fit, fit2)
+```
+
+From this p-value we must reject the null hypothesis.
+
+This means that our multivariate model is significantly different from our simple model.
+
+### Residuals Analysis
+
+```{r echo=FALSE, message=FALSE}
+qplot(.fitted, .resid, data = fit2) +
+  geom_hline(yintercept = 0) +
+  geom_smooth(se = FALSE)
+```
+
+From the plot above, the residuals are normally distributed.
+
+### Conclusions
+
+```{r}
+summary(fit2)
+```
+
+We have concluded that **vehicles with manual transmissions, on average, have better (higher) MPG**.
+
+From the figure above we can see that **vehicles with manual transmissions average roughly 2 miles per gallon more than vehicles with automatic transmissions**.
+
+Additionally, we can see that weight had the largest confounding effect on the relationship between transmission type and MPG.  Also, we can see from the Multiple R-squared that means in terms of uncertainty that this model explains about 84% of the variance.
+
